@@ -1,4 +1,4 @@
-#!/Users/brunods/anaconda3/bin/python
+#! /Users/brunods/anaconda3/bin/python
 '''
 program that emails text
 program that converts pdf to text
@@ -12,6 +12,8 @@ import time
 import os
 import brunods_email as bd_email
 import brunods_mysql as bd_sql
+import sys
+import pickle
 import PyPDF2
 
 
@@ -22,6 +24,7 @@ a reader has a certain number of hours available per day
 a reader has a reading_list that can be updated
 a reader has preferences
 '''
+
 class reader:
 
 	def __init__(self, name, email, wpm, reading_list, minutes_per_day=None, preferences=None):
@@ -53,11 +56,11 @@ class reader:
 		
 class book:
 	
-	def __init__(self, name, file_path, file, bookmark=0, word_start=0, book_path="/Users/brunods/documents/book_pages/", 
+	def __init__(self, file, bookmark=0, word_start=0, book_path="/Users/brunods/documents/book_pages/", 
 		num_words=None, num_pages=None, author=None):
-		self.name = name
-		self.file_path = file_path
+		self.name = filename.rstrip('.pdf')
 		self.file = file
+		self.file_path = '/Users/brunods/Documents/reading_list/'
 		self.bookmark = bookmark
 		self.word_start = word_start
 		self.book_path = book_path
@@ -69,6 +72,9 @@ class book:
 		if bookmark is not 0:
 			self.word_start = sum([self.words_per_page[i] for i in range(bookmark)])
 
+	def __repr__(self):
+		return str(self.word_start)
+
 	def initialize_num_words(self):
 		text_file = pdf_to_txt(self.file_path + self.file)
 		text = text_to_str(text_file)
@@ -76,6 +82,7 @@ class book:
 		return words
 
 	def initialize_num_pages(self):
+		print('Initializing number of pages', self.file_path + self.file)
 		pdfFileObj = open(self.file_path + self.file, 'rb')
 		pdfReader = PyPDF2.PdfFileReader(pdfFileObj, strict=False)
 		num_pages = pdfReader.numPages
@@ -97,13 +104,11 @@ class book:
 				pdfWriter.write(pdfOutputFile)
 				pdfOutputFile.close()
 				page_text = textract.process(file_name).decode("utf-8")
-				#print("words in page: ", len(str(page_text).split(' ')))
 				words_in_page = len(page_text.split(' '))
 				all_text.append(page_text)
 				words_per_page.append(words_in_page)
 			else:
 				page_text = textract.process(file_name).decode("utf-8")
-				#print("words in page: ", len(str(page_text).split(' ')))
 				words_in_page = len(page_text.split(' '))
 				all_text.append(page_text)
 				words_per_page.append(words_in_page)
@@ -111,31 +116,13 @@ class book:
 		pdfFileObj.close()
 		return words_per_page, all_text
 
-		
+	def save_txt(self):
+		with open("SAVED.txt", "w") as f:
+			f.write(str(self.all_text))
 
 	def __repr__(self):
 		return self.name
 
-	# gets a chunk of the book and returns text; saves to txt
-	# chunk = time/day * wpm
-	# time/day is a reader attribute
-	# returns words per day
-	def write_chunk(self, wpm, minutes_per_day, save_file=True):
-		wpd = minutes_per_day * wpm
-		word_end = self.word_start + wpd
-		text_file = pdf_to_txt(self.file, save=save_file)
-		text = text_to_str(text_file)
-		text_list = text.split(' ')
-		'''
-		with open("BRUNO_TEST2.txt", 'w') as f:
-			for w in text_list[self.bookmark:wpd]:
-				f.write(w + " ")
-		'''
-		file_email = self.book_path + self.file.strip(".pdf") + ".pdf"
-		bd_email.email(text=text, file=file_email)
-		print("Number of words to read: " + str(len(text_list)))
-		return text_list
-	
 	def email_pdf_pages(self, wpm, minutes_per_day, save_file=True):
 		wpd = minutes_per_day * wpm
 		word_end = self.word_start + wpd
@@ -148,11 +135,11 @@ class book:
 			except:
 				print("could not convert pdf to txt")
 			text = text_to_str(text_file)
-			print(text[0:10])
+			#print(text[0:10])
 			text_list = text.split(' ')
 			words_in_page = len(text_list)
-			print("words in page ", self.bookmark, ": ", words_in_page)
-			print("ending on ", word_end)
+			#print("words in page ", self.bookmark, ": ", words_in_page)
+			#print("ending on ", word_end)
 			self.word_start += words_in_page
 			file_email.append(self.book_path + self.file.strip(".pdf") + str(self.bookmark) + ".pdf")
 			self.bookmark += 1
@@ -161,18 +148,24 @@ class book:
 		for a_bin, start in bins:
 			if self.word_start >= start:
 				self.bookmark = a_bin
-		print("files to email: ", file_email)
+		#print("files to email: ", file_email)
 		try:
 			if word_end > self.num_words:
 				print("Ran out of pages! Now what?")
 				print("Words remaining: ", word_end - self.num_words)
-			bd_email.email(text=text, file=file_email)
+			print('Trying to email {}'.format(self.name))
+			bd_email.email(text='testing', file=file_email, filename=self.name)
 			
 		except:
+			e = sys.exc_info()[0]
+			print(e)
 			self.word_start = original_start
 			self.bookmark = original_bookmark
-			print("I tried!")
-			Exception("Could not send email")
+			print("I tried! Could not send {}".format(self.name))
+			print('word_start: {}'.format(self.word_start))
+			print('num_words: {}'.format(self.num_words))
+			print('num_pages: {}'.format(self.num_pages))
+			print('word_end: {}'.format(word_end))
 
 
 '''
@@ -252,8 +245,6 @@ def text_to_str(text_file):
 	else:
 		Exception("Please input text file")
 
-
-
 # takes in a text file and outputs num of words
 def get_num_words(text):
 	words = text.split(" ")
@@ -266,12 +257,52 @@ def get_random_text():
 
 if __name__ == "__main__":
 	print("This is the main script")
+	wpm = 600
+	minutes_per_day = 10
+	pickle_file = 'library.file'
+	current_directory = os.path.dirname(os.path.realpath('__file__'))
+	library_path = '/Users/brunods/Documents/reading_list'
+	dict_books = {} # filename : book
+	# try to open up pickle file
+	try:
+		with open(pickle_file, 'rb') as f:
+			dict_books = pickle.load(f)
+			print('Loading dict_books')
+			print(dict_books)
+	# check if books in folder are in pickle dict
+	except:
+		print('Could not open the pickle file {}... creating new one'.format(pickle_file))
+		with open(pickle_file, 'wb') as f:
+			print('Created {} in {}'.format(pickle_file, current_directory))
+	# iterate through reading folder	
+	for filename in os.listdir(library_path):
+		if filename.endswith('.pdf') == False:
+			continue
+		if filename in dict_books.keys():
+			dict_books[filename].email_pdf_pages(wpm, minutes_per_day)
+		else:
+			# create book object
+			print('This is a new book!')
+			print(filename)
+			page_start = int(input('Which page would you like to start on?'))
+			my_book = book(filename, bookmark=page_start)
+			print(my_book, type(my_book))
+			my_book.email_pdf_pages(wpm, minutes_per_day)
+			# add it to the dict
+			dict_books[filename] = my_book
+	# pickle dict
+	with open(pickle_file, 'wb') as file:
+		pickle.dump(dict_books, file, pickle.HIGHEST_PROTOCOL)
 
-	me = bd.reader("Bruno", "gmail", 800, None, 10, None)
+	print('Percent done')
+	for a_book in dict_books.values():
+		book_name = a_book.name
+		percent_done = a_book.word_start \
+					/ a_book.num_words \
+					* 100
+		print('{} is {}% complete'.format(book_name, percent_done))
+		print('bookmark: {}'.format(a_book.bookmark))
+		print('num_words total: {}'.format(a_book.num_words))
+		print('words read: {}'.format(a_book.word_start))
 
-	rules_of_ml = bd.book("Rules of ML", "/Users/brunods/"
-		"Library/Mobile Documents/com~apple~CloudDocs/Desktop/"
-		"no clutter/Texts/rules_of_ml.pdf")
-	rules_of_ml.write_chunk(me.wpm, me.minutes_per_day)
 
-	

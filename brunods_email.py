@@ -1,36 +1,27 @@
 #!/Users/brunods/anaconda3/bin/python
 import smtplib
 from os.path import basename
+import os
 from email.mime.application import MIMEApplication
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 import PyPDF2
 
-def email(text, file=None, my_email="brunods1001@gmail.com", my_pass="ytothe2plusx", subject="Daily Reading"):
+def email(text, file=None, filename=None, my_email="brunods1001@gmail.com", my_pass="ytothe2plusx", subject="Daily Reading"):
 	# set up smtp server
+	if filename is None:
+		filename = ''
+	text = filename
 	s = smtplib.SMTP(host='smtp.gmail.com', port=587)
 	s.starttls()
 	s.login(my_email, my_pass)
 	msg = MIMEMultipart()
 	msg['From'] = my_email
 	msg['To'] = my_email
-	msg['Subject'] = subject
+	msg['Subject'] = subject + ' ' + filename
 	msg.attach(MIMEText(text, 'plain'))
-	
-	
-	print("Email sent!")
-	
+
 	if type(file) == list:
-		print("File is a list!")
-		'''
-		for fi in file:
-			# send message
-			with open(fi, "rb") as f:
-					part = MIMEApplication(f.read(), _subtype="pdf")
-			
-			#part['Content-Disposition'] = 'attachment; filename="%s"' % "TEST"
-			msg.attach(part)
-		'''
 		new="/Users/brunods/Documents/python_scripts/AAAEMAILDELETE.pdf"
 		pdf_cat(file, new)
 		with open(new, "rb") as f:
@@ -42,12 +33,18 @@ def email(text, file=None, my_email="brunods1001@gmail.com", my_pass="ytothe2plu
 		
 		#part['Content-Disposition'] = 'attachment; filename="%s"' % "TEST"
 		msg.attach(part)
+
 	s.send_message(msg)
 	del msg
+
+	print("Email sent!")
+	
 
 def pdf_cat(input_files, output_stream):
 	pdfWriter = PyPDF2.PdfFileWriter()
 	for file in input_files:
+		if file.split('/')[-1] not in os.listdir('/'.join(file.split('/')[:-1])):
+			continue
 		pdfFile = open(file, 'rb')
 		pdfReader = PyPDF2.PdfFileReader(file)
 		for pageNum in range(pdfReader.numPages):
